@@ -246,7 +246,16 @@ class GNMManager:
             parent=self.iface.mainWindow(),
             enabled_flag=False,
             status_tip=self.tr(u'Remove all flags: start, end and block'),
-            add_to_toolbar = True) 
+            add_to_toolbar = True)
+        self.action_remove_flag, self.toolbutton_remove_flag = self.add_action(
+            menu=menu_analysis,
+            icon_path=self.plugin_dir+'/icons/remove_one.png',
+            text=self.tr(u'Remove one flag'),
+            callback=self.onRemoveFlagClicked,
+            parent=self.iface.mainWindow(),
+            enabled_flag=False,
+            status_tip=self.tr(u'Remove selected flag'),
+            add_to_toolbar = True)
         self.action_path, self.toolbutton_path = self.add_action(       
             menu=menu_analysis,
             icon_path=self.plugin_dir+'/icons/path.png',
@@ -372,6 +381,8 @@ class GNMManager:
         self.LAYER_BLOCKFLAGS.triggerRepaint()  
         self.GFIDS_BLOCKFLAGS = []
 
+    def onRemoveFlagClicked(self):
+        self.clickFlagButton(self.toolbutton_remove_flag, QIcon(self.plugin_dir + '/icons/remove_one_pressed.png'))
 
     def onPathClicked(self):
         if self.NETWORK_DS is None:
@@ -456,7 +467,10 @@ class GNMManager:
             return
         features = [] # TEMPORARY. For future several features can be passed here.
         features.append(feature)
-        self.createFlags(features)
+        if self.PRESSED_TOOLB == self.toolbutton_remove_flag:
+            self.removeFlags(features)
+        else:
+            self.createFlags(features)
         self.clickFlagButton(self.PRESSED_TOOLB,None) # unpress any pressed flag button and unset map tool     
         
 
@@ -665,6 +679,31 @@ class GNMManager:
             for gfid in gfids:
                 self.GFIDS_BLOCKFLAGS.append(gfid)
 
+    def removeFlags(self, features):
+        if features == None or len(features) < 1:
+            return
+        idsStart = [f.id() for f in self.LAYER_STARTFLAG.getFeatures()]
+        idsEnd = [f.id() for f in self.LAYER_ENDFLAG.getFeatures()]
+        idsBlock = [f.id() for f in self.LAYER_BLOCKFLAGS.getFeatures()]
+        gfidDel = int(features[0].attribute(self.GNM_CONST_GFIDFIELD))
+        if gfidDel == self.GFID_STARTFLAG:
+            self.LAYER_STARTFLAG.dataProvider().deleteFeatures(idsStart)
+            self.GFID_STARTFLAG = -1
+            self.LAYER_STARTFLAG.triggerRepaint()
+            return
+        if gfidDel == self.GFID_ENDFLAG:
+            self.LAYER_ENDFLAG.dataProvider().deleteFeatures(idsEnd)
+            self.GFID_ENDFLAG = -1
+            self.LAYER_ENDFLAG.triggerRepaint()
+            return
+        i = 0
+        for gfidBlock in self.GFIDS_BLOCKFLAGS:
+            if gfidDel == gfidBlock:
+                self.GFIDS_BLOCKFLAGS.remove(gfidBlock)
+                self.LAYER_BLOCKFLAGS.dataProvider().deleteFeatures([int(idsBlock[i])])
+                self.LAYER_BLOCKFLAGS.triggerRepaint()
+                return
+            i += 1
 
     def resetStartOrEndFlag(self,feature,gfid_this,gfid_other,layer_this):
         gfid = int(feature.attribute(self.GNM_CONST_GFIDFIELD))
