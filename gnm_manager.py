@@ -265,6 +265,15 @@ class GNMManager:
             enabled_flag=False,
             status_tip=self.tr(u'Calculate the shortest path between start and end nodes'),
             add_to_toolbar = True)
+        self.action_remove_path, self.toolbutton_remove_path = self.add_action(
+            menu=menu_analysis,
+            icon_path=self.plugin_dir+'/icons/remove_path.png',
+            text=self.tr(u'Remove shortest path'),
+            callback=self.onRemovePathClicked,
+            parent=self.iface.mainWindow(),
+            enabled_flag=False,
+            status_tip=self.tr(u'Remove shortest path between start and end nodes from scheme'),
+            add_to_toolbar = True)
         self.action_paths, self.toolbutton_paths = self.add_action(        
             menu=menu_analysis,
             icon_path=self.plugin_dir+'/icons/paths.png',
@@ -409,7 +418,12 @@ class GNMManager:
             network.ReleaseResultSet(res_layer)
         for bl_gfid in self.GFIDS_BLOCKFLAGS: # unblock previously blocked features (anyway!)
             network.ChangeBlockState(bl_gfid, False)
-        
+
+    def onRemovePathClicked(self):
+        ids = [f.id() for f in self.LAYER_RESULT_PATH.getFeatures()]
+        self.LAYER_RESULT_PATH.dataProvider().deleteFeatures(ids)
+        self.LAYER_RESULT_PATH.triggerRepaint()
+
     def onPathsClicked(self):
         if self.NETWORK_DS is None:
             return
