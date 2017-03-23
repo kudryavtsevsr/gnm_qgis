@@ -259,7 +259,8 @@ class GNMManager:
             parent=self.iface.mainWindow(),
             enabled_flag=False,
             status_tip=self.tr(u'Remove selected flag'),
-            add_to_toolbar = True)
+            add_to_toolbar = True,
+            popup = True)
         self.action_remove_flags, self.toolbutton_remove_flags = self.add_action(       
             menu=menu_analysis,
             icon_path=self.plugin_dir+'/icons/remove_all.png',
@@ -268,7 +269,9 @@ class GNMManager:
             parent=self.iface.mainWindow(),
             enabled_flag=False,
             status_tip=self.tr(u'Remove all flags: start, end and block'),
-            add_to_toolbar = True)
+            add_to_toolbar = True,
+            popup = True,
+            parent_toolbutton = self.toolbutton_remove_flag)
         self.action_path, self.toolbutton_path = self.add_action(       
             menu=menu_analysis,
             icon_path=self.plugin_dir+'/icons/path.png',
@@ -277,7 +280,8 @@ class GNMManager:
             parent=self.iface.mainWindow(),
             enabled_flag=False,
             status_tip=self.tr(u'Calculate the shortest path between start and end nodes'),
-            add_to_toolbar = True)
+            add_to_toolbar = True,
+            popup = True)
         self.action_remove_path, self.toolbutton_remove_path = self.add_action(
             menu=menu_analysis,
             icon_path=self.plugin_dir+'/icons/remove_path.png',
@@ -286,7 +290,9 @@ class GNMManager:
             parent=self.iface.mainWindow(),
             enabled_flag=False,
             status_tip=self.tr(u'Remove shortest path between start and end nodes from scheme'),
-            add_to_toolbar = True)
+            add_to_toolbar = True,
+            popup = True,
+            parent_toolbutton = self.toolbutton_path)
         self.action_paths, self.toolbutton_paths = self.add_action(        
             menu=menu_analysis,
             icon_path=self.plugin_dir+'/icons/paths.png',
@@ -295,7 +301,8 @@ class GNMManager:
             parent=self.iface.mainWindow(),
             enabled_flag=False,
             status_tip=self.tr(u'Calculate ' + str(self.GNM_SETTING_K) + ' shortest paths between start and end nodes'),
-            add_to_toolbar = True)
+            add_to_toolbar = True,
+            popup = True)
         self.action_remove_paths, self.toolbutton_remove_paths = self.add_action(
             menu=menu_analysis,
             icon_path=self.plugin_dir+'/icons/remove_paths.png',
@@ -304,7 +311,9 @@ class GNMManager:
             parent=self.iface.mainWindow(),
             enabled_flag=False,
             status_tip=self.tr(u'Remove ' + str(self.GNM_SETTING_K) + ' shortest paths between start and end nodes from scheme'),
-            add_to_toolbar = True)
+            add_to_toolbar = True,
+            popup = True,
+            parent_toolbutton = self.toolbutton_paths)
         self.action_connectivity, self.toolbutton_connectivity = self.add_action(       
             menu=menu_analysis,
             icon_path=self.plugin_dir+'/icons/connectivity.png',
@@ -313,7 +322,8 @@ class GNMManager:
             parent=self.iface.mainWindow(),
             enabled_flag=False,
             status_tip=self.tr(u'Calculate the tree from start node to all connected nodes'),
-            add_to_toolbar = True)
+            add_to_toolbar = True,
+            popup = True)
         self.action_remove_connectivity, self.toolbutton_remove_connectivity = self.add_action(
             menu=menu_analysis,
             icon_path=self.plugin_dir+'/icons/remove_connectivity.png',
@@ -322,7 +332,9 @@ class GNMManager:
             parent=self.iface.mainWindow(),
             enabled_flag=False,
             status_tip=self.tr(u'Remove the tree from start node to all connected nodes from scheme'),
-            add_to_toolbar = True)
+            add_to_toolbar = True,
+            popup = True,
+            parent_toolbutton = self.toolbutton_connectivity)
             
         # Initialize map tool.
         self.map_tool = IdentifyGeometry(self.iface.mapCanvas())
