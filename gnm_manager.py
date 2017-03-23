@@ -250,15 +250,6 @@ class GNMManager:
             parent=self.iface.mainWindow(),
             enabled_flag=False,
             status_tip=self.tr(u'Mark features as blocked nodes'),
-            add_to_toolbar = True)            
-        self.action_remove_flags, self.toolbutton_remove_flags = self.add_action(       
-            menu=menu_analysis,
-            icon_path=self.plugin_dir+'/icons/remove_all.png',
-            text=self.tr(u'Remove all flags'),
-            callback=self.onRemoveFlagsClicked,
-            parent=self.iface.mainWindow(),
-            enabled_flag=False,
-            status_tip=self.tr(u'Remove all flags: start, end and block'),
             add_to_toolbar = True)
         self.action_remove_flag, self.toolbutton_remove_flag = self.add_action(
             menu=menu_analysis,
@@ -268,6 +259,15 @@ class GNMManager:
             parent=self.iface.mainWindow(),
             enabled_flag=False,
             status_tip=self.tr(u'Remove selected flag'),
+            add_to_toolbar = True)
+        self.action_remove_flags, self.toolbutton_remove_flags = self.add_action(       
+            menu=menu_analysis,
+            icon_path=self.plugin_dir+'/icons/remove_all.png',
+            text=self.tr(u'Remove all flags'),
+            callback=self.onRemoveFlagsClicked,
+            parent=self.iface.mainWindow(),
+            enabled_flag=False,
+            status_tip=self.tr(u'Remove all flags: start, end and block'),
             add_to_toolbar = True)
         self.action_path, self.toolbutton_path = self.add_action(       
             menu=menu_analysis,
@@ -295,6 +295,15 @@ class GNMManager:
             parent=self.iface.mainWindow(),
             enabled_flag=False,
             status_tip=self.tr(u'Calculate ' + str(self.GNM_SETTING_K) + ' shortest paths between start and end nodes'),
+            add_to_toolbar = True)
+        self.action_remove_paths, self.toolbutton_remove_paths = self.add_action(
+            menu=menu_analysis,
+            icon_path=self.plugin_dir+'/icons/remove_paths.png',
+            text=self.tr(u'Remove ' + str(self.GNM_SETTING_K) + ' shortest paths'),
+            callback=self.onRemovePathsClicked,
+            parent=self.iface.mainWindow(),
+            enabled_flag=False,
+            status_tip=self.tr(u'Remove ' + str(self.GNM_SETTING_K) + ' shortest paths between start and end nodes from scheme'),
             add_to_toolbar = True)
         self.action_connectivity, self.toolbutton_connectivity = self.add_action(       
             menu=menu_analysis,
@@ -464,7 +473,13 @@ class GNMManager:
             network.ReleaseResultSet(res_layer)
         for bl_gfid in self.GFIDS_BLOCKFLAGS: 
             network.ChangeBlockState(bl_gfid, False)
-        
+
+    def onRemovePathsClicked(self):
+        for layer in self.LAYERS_RESULT_PATHS:
+            ids = [f.id() for f in layer.getFeatures()]
+            layer.dataProvider().deleteFeatures(ids)
+            layer.triggerRepaint()
+
     def onConnectivityClicked(self):
         if self.NETWORK_DS is None:
             return
