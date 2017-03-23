@@ -314,6 +314,15 @@ class GNMManager:
             enabled_flag=False,
             status_tip=self.tr(u'Calculate the tree from start node to all connected nodes'),
             add_to_toolbar = True)
+        self.action_remove_connectivity, self.toolbutton_remove_connectivity = self.add_action(
+            menu=menu_analysis,
+            icon_path=self.plugin_dir+'/icons/remove_connectivity.png',
+            text=self.tr(u'Remove connectivity'),
+            callback=self.onRemoveConnectivityClicked,
+            parent=self.iface.mainWindow(),
+            enabled_flag=False,
+            status_tip=self.tr(u'Remove the tree from start node to all connected nodes from scheme'),
+            add_to_toolbar = True)
             
         # Initialize map tool.
         self.map_tool = IdentifyGeometry(self.iface.mapCanvas())
@@ -503,6 +512,10 @@ class GNMManager:
         for bl_gfid in self.GFIDS_BLOCKFLAGS:
             network.ChangeBlockState(bl_gfid, False)
 
+    def onRemoveConnectivityClicked(self):
+        ids = [f.id() for f in self.LAYER_RESULT_CONNECTIVITY.getFeatures()]
+        self.LAYER_RESULT_CONNECTIVITY.dataProvider().deleteFeatures(ids)
+        self.LAYER_RESULT_CONNECTIVITY.triggerRepaint()
 
     def onIdentifyFeature(self,layer,feature):
         if self.PRESSED_TOOLB is None: # skip any actions if no flag button pressed
