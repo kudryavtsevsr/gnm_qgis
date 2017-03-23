@@ -142,16 +142,28 @@ class GNMManager:
         status_tip = None,
         whats_this = None,
         add_to_toolbar = False,
-        parent = None):
+        parent = None,
+        popup = False,
+        parent_toolbutton = None):
 
         icon = QIcon(icon_path)
         action = QAction(icon, text, parent)
-        toolbutton = QToolButton()
-        toolbutton.setIcon(icon)
-        
+        if parent_toolbutton is None:
+            toolbutton = QToolButton()
+            toolbutton.setIcon(icon)
+        if popup and parent_toolbutton is None:
+            toolbutton.setMenu(QMenu())
+            toolbutton.setPopupMode(QToolButton.MenuButtonPopup)
+            toolbutton.setDefaultAction(action)
+        if popup and parent_toolbutton is not None:
+            toolbutton = parent_toolbutton
+        if popup:
+            toolbutton.menu().addAction(action)
+
         if callback is not None:
             action.triggered.connect(callback)
-            toolbutton.clicked.connect(callback)
+            if popup is False:
+                toolbutton.clicked.connect(callback)
             
         action.setEnabled(enabled_flag)
         toolbutton.setEnabled(enabled_flag)
@@ -168,10 +180,11 @@ class GNMManager:
         else:
             menu.addAction(action)  
         self.actions.append(action)
-        
-        if add_to_toolbar:
-            #self.toolbar.addAction(action)   
+
+        if add_to_toolbar and parent_toolbutton is None:
             self.toolbar.addWidget(toolbutton) # otherwise it is not able to get the toolbutton from toolbar
+        if add_to_toolbar:
+            #self.toolbar.addAction(action)
             self.toolbuttons.append(toolbutton)
         else:
             toolbutton = None
