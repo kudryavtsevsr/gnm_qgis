@@ -36,11 +36,22 @@ from PyQt4.QtGui import *
 from create_dialog import GNMCreateDialog
 from load_dialog import GNMLoadDialog
 from remove_dialog import GNMRemoveDialog
+from simplify_dialog import SimplifyDialog
 import os.path
 from qgis.core import *
 import qgis.utils
 from _gnm_feature_tool import IdentifyGeometry
 
+import datetime
+# A Python implementation of the Visvalingam-Wyatt line simplification algorithm
+import imp
+try:
+    module_vw = imp.find_module('visvalingamwyatt')
+    vwFound = True
+except:
+    vwFound = False
+if vwFound:
+    import visvalingamwyatt as vw
 
 class GNMManager:
     """Plugin's entry point"""
@@ -122,6 +133,7 @@ class GNMManager:
         self.dlg_create = GNMCreateDialog(self.plugin_dir)
         self.dlg_load = GNMLoadDialog()
         self.dlg_remove = GNMRemoveDialog()
+        self.dlg_simplify = SimplifyDialog()
 
         # Declare instance attributes
         self.actions = []
@@ -345,6 +357,15 @@ class GNMManager:
             enabled_flag=False)
         menu_layouts = QMenu('menu')
         self.action_layouts.setMenu(menu_layouts)
+        self.action_simplify, self.toolbutton_simplify = self.add_action(
+            menu=menu_layouts,
+            icon_path=self.plugin_dir + '/icons/simplify_layout.png',
+            text=self.tr(u'Simplify layout'),
+            callback=self.onSimplifyClicked,
+            parent=self.iface.mainWindow(),
+            enabled_flag=False,
+            status_tip=self.tr(u'Make simplify layout'),
+            add_to_toolbar=False)
 
         # Initialize map tool.
         self.map_tool = IdentifyGeometry(self.iface.mapCanvas())
@@ -538,6 +559,131 @@ class GNMManager:
         ids = [f.id() for f in self.LAYER_RESULT_CONNECTIVITY.getFeatures()]
         self.LAYER_RESULT_CONNECTIVITY.dataProvider().deleteFeatures(ids)
         self.LAYER_RESULT_CONNECTIVITY.triggerRepaint()
+
+    def onSimplifyClicked(self):
+        self.dlg_simplify.show()
+        result = self.dlg_simplify.my_exec_()
+        if result == 1:
+            root_layer_tree = QgsProject.instance().layerTreeRoot()
+            common_group = root_layer_tree.findGroup(self.NETWORK_NAME)
+            network_fullpath = self.NETWORK_FULLPATH
+
+            group_name = '_simplify_layout'
+            direct_angles_group = QgsLayerTreeGroup(group_name)
+            common_group.insertChildNode(1, direct_angles_group)
+
+            path_direct_angles = os.path.join(os.path.abspath(network_fullpath), group_name)
+            if os.path.exists(path_direct_angles):
+                net_name = '%s(%s)' % (group_name, datetime.datetime.now().strftime("%d-%m-%Y %H-%M-%S"))
+            else:
+                net_name = group_name
+
+            dataset_base = self.NETWORK_DS
+            network_fullpath = self.NETWORK_FULLPATH
+            network_base = gnm.CastToNetwork(dataset_base)
+
+            # Create new dataset
+            driver = gdal.GetDriverByName(str(u'GNMFile'))
+            dataset_direct = driver.Create(str(network_fullpath), 0, 0, 0, gdal.GDT_Unknown,
+                                           [u'net_name=' + net_name,
+                                            u'net_description=' + network_base.GetDescription(),
+                                            u'net_srs=' + network_base.GetProjection()])
+
+            network = gnm.CastToNetwork(dataset_direct)
+            gen_network = gnm.CastToGenericNetwork(dataset_direct)
+
+            layers_base_count = dataset_base.GetLayerCount()
+            for i in range(0, layers_base_count):
+                layer_base = dataset_base.GetLayerByIndex(i)
+                layer_base_name = layer_base.GetName()
+                network.CopyLayer(layer_base, str(layer_base_name))
+
+            layers_direct_count = dataset_direct.GetLayerCount()
+            layers_direct = []
+            layers_direct_names = []
+            for i in range(0, layers_direct_count):
+                layer_direct = dataset_direct.GetLayerByIndex(i)
+                layers_direct.append(layer_direct)
+                layers_direct_name = layer_direct.GetName()
+                layers_direct_names.append(layers_direct_name)
+
+            # Choose one linear layer
+            for item in layers_direct:
+                if item.GetGeomType() == 2:
+                    layer = item
+                    break
+
+            if not layer:
+                self.showWarn(self.tr(u'No linear layer!'))
+                return
+
+            # Pass through all the objects on the layer and search for the polyline
+            layer.ResetReading()
+            polylines = []
+            feat = layer.GetNextFeature()
+            while feat is not None:
+                pointCount = feat.GetGeometryRef().GetPointCount()
+                if pointCount > 2:
+                    polylines.append(feat)
+                feat = layer.GetNextFeature()
+
+            # Pass through each polyline and simplify
+            for polyline in polylines:
+                polylineGeom = polyline.GetGeometryRef()
+                points = polylineGeom.GetPoints()
+
+                # Douglas-Peucker
+                if self.dlg_simplify.Algorithm == 0:
+                    distance_tolerance = float(self.dlg_simplify.Tolerance)
+                    simplify = polylineGeom.Simplify(distance_tolerance)
+                # Visvalingam
+                if self.dlg_simplify.Algorithm == 1:
+                    if not vwFound:
+                        self.showWarn(self.tr(u'visvalingamwyatt module not found'))
+                        return
+                    simplifier = vw.Simplifier(points)
+                    ratio = float(self.dlg_simplify.Ratio)
+                    number = None
+                    threshold = None
+                    simplify = simplifier.simplify(number, ratio, threshold)
+                    new_line = ogr.Geometry(ogr.wkbLineString)
+                    for point in simplify:
+                        new_line.AddPoint(point[0], point[1])
+                    simplify = new_line
+
+                polyline.SetGeometryDirectly(simplify)
+                layer.SetFeature(polyline)
+
+            for item in layers_direct:
+                item.ResetReading()
+
+            gen_network.ConnectPointsByLines(layers_direct_names, 0.00005, 1, 1, gnm.GNM_EDGE_DIR_BOTH)
+
+            dataset_base = None
+            dataset_direct = None
+            network_base = None
+            gen_network = None
+            network = None
+
+            net_fullpath = network_fullpath + '/' + net_name
+            dataset_direct = gdal.OpenEx(str(net_fullpath))
+            self.NETWORK_DS = dataset_direct
+            self.NETWORK_FULLPATH = net_fullpath
+
+            layers_passed_count = 0
+            data_layer_count = dataset_direct.GetLayerCount()
+            for i in range(0, data_layer_count):
+                gdal_layer = dataset_direct.GetLayer(i)
+                data_layer = self.loadDataLayer(direct_angles_group, gdal_layer, network_fullpath + '/' + net_name)
+                if data_layer is None:
+                    layers_passed_count = layers_passed_count + 1
+                    continue
+                self.LAYERS_DATA.append(data_layer)
+            if layers_passed_count != 0:
+                self.showWarn(self.tr(u'Network layers skipped (unable to read): ') + str(layers_passed_count))
+
+            data_group = root_layer_tree.findGroup('Data')
+            data_group.setVisible(False)
 
     def onIdentifyFeature(self,layer,feature):
         if self.PRESSED_TOOLB is None: # skip any actions if no flag button pressed
