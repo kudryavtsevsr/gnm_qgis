@@ -335,7 +335,17 @@ class GNMManager:
             add_to_toolbar = True,
             popup = True,
             parent_toolbutton = self.toolbutton_connectivity)
-            
+
+        self.action_layouts, stub = self.add_action(
+            menu=None,
+            icon_path=None,
+            text=self.tr(u'Layouts'),
+            callback=None,
+            parent=self.iface.mainWindow(),
+            enabled_flag=False)
+        menu_layouts = QMenu('menu')
+        self.action_layouts.setMenu(menu_layouts)
+
         # Initialize map tool.
         self.map_tool = IdentifyGeometry(self.iface.mapCanvas())
         QObject.connect(self.map_tool , SIGNAL("geomIdentified") , self.onIdentifyFeature)
