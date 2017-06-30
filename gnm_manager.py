@@ -37,6 +37,7 @@ from create_dialog import GNMCreateDialog
 from load_dialog import GNMLoadDialog
 from remove_dialog import GNMRemoveDialog
 from simplify_dialog import SimplifyDialog
+from change_dialog import ChangeDialog
 import os.path
 from qgis.core import *
 import qgis.utils
@@ -92,9 +93,8 @@ class GNMManager:
     GNM_CONST_GFIDFIELD = 'gnm_fid'
     GNM_CONST_PATHNUMFIELD = 'path_num'
     
-# TODO: here will be an array of networks.  
-    NETWORK_DS = None
-    NETWORK_FULLPATH = ''
+    NETWORK_DS = {'Data':None}
+    NETWORK_FULLPATH = {'Data':''}
     NETWORK_NAME = ''
     
     GFID_STARTFLAG = -1
@@ -102,7 +102,9 @@ class GNMManager:
     GFIDS_BLOCKFLAGS = []
     
     GNM_SETTING_K = 5
-    
+
+    LAYOUTS = ['Data']
+    LAYOUT = 'Data'
 
     def __init__(self, iface):
         """Constructor.
@@ -348,6 +350,16 @@ class GNMManager:
             popup = True,
             parent_toolbutton = self.toolbutton_connectivity)
 
+        self.action_change_layout, self.toolbutton_change_layout = self.add_action(
+            menu=menu_analysis,
+            icon_path=self.plugin_dir+'/icons/change_layout.png',
+            text=self.tr(u'Change layout'),
+            callback=self.onChangeLayoutClicked,
+            parent=self.iface.mainWindow(),
+            enabled_flag=False,
+            status_tip=self.tr(u'Change layout'),
+            add_to_toolbar=True)
+
         self.action_layouts, stub = self.add_action(
             menu=None,
             icon_path=None,
@@ -386,7 +398,7 @@ class GNMManager:
             #self.iface.removeToolBarIcon(action)
         del self.toolbar
         self.removeGnmLayersGroup()
-        self.NETWORK_DS = None
+        self.NETWORK_DS = {'Data':None}
 
         
 #******************************************************************************************#
@@ -399,8 +411,8 @@ class GNMManager:
         self.dlg_create.show()
         result = self.dlg_create.my_exec_()
         if result == 1:
-            self.NETWORK_DS = self.dlg_create.NETWORK_DS
-            self.NETWORK_FULLPATH = self.dlg_create.NETWORK_FULLPATH
+            self.NETWORK_DS['Data'] = self.dlg_create.NETWORK_DS
+            self.NETWORK_FULLPATH['Data'] = self.dlg_create.NETWORK_FULLPATH
             self.createGnmLayersGroup()
             self.enableMenusForNetwork(True)
             self.updateLayersToSearchForFlags()
@@ -410,8 +422,8 @@ class GNMManager:
         self.dlg_load.show() 
         result = self.dlg_load.my_exec_()
         if result == 1:
-            self.NETWORK_DS = self.dlg_load.NETWORK_DS
-            self.NETWORK_FULLPATH = self.dlg_load.NETWORK_FULLPATH
+            self.NETWORK_DS['Data'] = self.dlg_load.NETWORK_DS
+            self.NETWORK_FULLPATH['Data'] = self.dlg_load.NETWORK_FULLPATH
             self.createGnmLayersGroup()
             self.enableMenusForNetwork(True)
             self.updateLayersToSearchForFlags()
@@ -424,7 +436,7 @@ class GNMManager:
         self.dlg_remove.show() 
         result = self.dlg_remove.my_exec_()
         if result == 1:
-            self.NETWORK_DS = None
+            self.NETWORK_DS = {'Data':None}
             ok_to_del = self.dlg_remove.FULLY_DELETE
             if ok_to_del:
 # TODO: really pass here the selected GNM format:           
@@ -468,9 +480,9 @@ class GNMManager:
         self.clickFlagButton(self.toolbutton_remove_flag, QIcon(self.plugin_dir + '/icons/remove_one_pressed.png'))
 
     def onPathClicked(self):
-        if self.NETWORK_DS is None:
+        if self.NETWORK_DS[self.LAYOUT] is None:
             return
-        network = gnm.CastToGenericNetwork(self.NETWORK_DS)
+        network = gnm.CastToGenericNetwork(self.NETWORK_DS[self.LAYOUT])
         if network is None:
             return
         if self.GFID_STARTFLAG == -1:
@@ -499,9 +511,9 @@ class GNMManager:
         self.LAYER_RESULT_PATH.triggerRepaint()
 
     def onPathsClicked(self):
-        if self.NETWORK_DS is None:
+        if self.NETWORK_DS[self.LAYOUT] is None:
             return
-        network = gnm.CastToGenericNetwork(self.NETWORK_DS)
+        network = gnm.CastToGenericNetwork(self.NETWORK_DS[self.LAYOUT])
         if network is None:
             return
         if self.GFID_STARTFLAG == -1:
@@ -533,9 +545,9 @@ class GNMManager:
             layer.triggerRepaint()
 
     def onConnectivityClicked(self):
-        if self.NETWORK_DS is None:
+        if self.NETWORK_DS[self.LAYOUT] is None:
             return
-        network = gnm.CastToGenericNetwork(self.NETWORK_DS)
+        network = gnm.CastToGenericNetwork(self.NETWORK_DS[self.LAYOUT])
         if network is None:
             return
         if self.GFID_STARTFLAG == -1:
@@ -566,9 +578,15 @@ class GNMManager:
         if result == 1:
             root_layer_tree = QgsProject.instance().layerTreeRoot()
             common_group = root_layer_tree.findGroup(self.NETWORK_NAME)
-            network_fullpath = self.NETWORK_FULLPATH
+            # Open the base data set
+            dataset_base = self.NETWORK_DS['Data']
+            network_fullpath = self.NETWORK_FULLPATH['Data']
+            network_base = gnm.CastToNetwork(dataset_base)
 
-            group_name = '_simplify_layout'
+            data_group = root_layer_tree.findGroup('Data')
+            data_group.setVisible(False)
+
+            group_name = 'Data_simplify_layout'
             simplify_layout_group = QgsLayerTreeGroup(group_name)
             common_group.insertChildNode(1, simplify_layout_group)
 
@@ -577,10 +595,6 @@ class GNMManager:
                 net_name = '%s(%s)' % (group_name, datetime.datetime.now().strftime("%d-%m-%Y %H-%M-%S"))
             else:
                 net_name = group_name
-
-            dataset_base = self.NETWORK_DS
-            network_fullpath = self.NETWORK_FULLPATH
-            network_base = gnm.CastToNetwork(dataset_base)
 
             # Create new dataset
             driver = gdal.GetDriverByName(str(u'GNMFile'))
@@ -668,8 +682,8 @@ class GNMManager:
 
             net_fullpath = network_fullpath + '/' + net_name
             dataset_simplify = gdal.OpenEx(str(net_fullpath))
-            self.NETWORK_DS = dataset_simplify
-            self.NETWORK_FULLPATH = net_fullpath
+            self.NETWORK_DS[group_name] = dataset_simplify
+            self.NETWORK_FULLPATH[group_name] = net_fullpath
 
             layers_passed_count = 0
             data_layer_count = dataset_simplify.GetLayerCount()
@@ -683,8 +697,24 @@ class GNMManager:
             if layers_passed_count != 0:
                 self.showWarn(self.tr(u'Network layers skipped (unable to read): ') + str(layers_passed_count))
 
-            data_group = root_layer_tree.findGroup('Data')
-            data_group.setVisible(False)
+            # Add new layout to dict
+            self.LAYOUTS.append(group_name)
+            self.LAYOUT = group_name
+
+    def onChangeLayoutClicked(self):
+        self.dlg_change = ChangeDialog(self.LAYOUTS, self.LAYOUT)
+        self.dlg_change.show()
+        result = self.dlg_change.my_exec_()
+        if result == 1:
+            layout = self.dlg_change.Layout
+            root_layer_tree = QgsProject.instance().layerTreeRoot()
+            for group in self.LAYOUTS:
+                group = root_layer_tree.findGroup(str(group))
+                if group.name() != layout:
+                    group.setVisible(0)
+                else:
+                    group.setVisible(2)
+                    self.LAYOUT = group.name()
 
     def onIdentifyFeature(self,layer,feature):
         if self.PRESSED_TOOLB is None: # skip any actions if no flag button pressed
@@ -715,12 +745,12 @@ class GNMManager:
         
     def createGnmLayersGroup (self):
         """Create special set of layers for the QGIS GNM"""
-        dataset = self.NETWORK_DS
-        network = gnm.CastToGenericNetwork(self.NETWORK_DS)
+        dataset = self.NETWORK_DS['Data']
+        network = gnm.CastToGenericNetwork(self.NETWORK_DS['Data'])
         if network is None:
             self.showMsgBox(self.tr(u'Error working with network'))
             return False
-        network_fullpath = self.NETWORK_FULLPATH
+        network_fullpath = self.NETWORK_FULLPATH['Data']
         self.NETWORK_NAME = network.GetName()
         network_srs = network.GetProjectionRef()
         
