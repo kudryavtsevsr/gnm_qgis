@@ -569,11 +569,11 @@ class GNMManager:
             network_fullpath = self.NETWORK_FULLPATH
 
             group_name = '_simplify_layout'
-            direct_angles_group = QgsLayerTreeGroup(group_name)
-            common_group.insertChildNode(1, direct_angles_group)
+            simplify_layout_group = QgsLayerTreeGroup(group_name)
+            common_group.insertChildNode(1, simplify_layout_group)
 
-            path_direct_angles = os.path.join(os.path.abspath(network_fullpath), group_name)
-            if os.path.exists(path_direct_angles):
+            path_simplify_layout = os.path.join(os.path.abspath(network_fullpath), group_name)
+            if os.path.exists(path_simplify_layout):
                 net_name = '%s(%s)' % (group_name, datetime.datetime.now().strftime("%d-%m-%Y %H-%M-%S"))
             else:
                 net_name = group_name
@@ -584,13 +584,13 @@ class GNMManager:
 
             # Create new dataset
             driver = gdal.GetDriverByName(str(u'GNMFile'))
-            dataset_direct = driver.Create(str(network_fullpath), 0, 0, 0, gdal.GDT_Unknown,
+            dataset_simplify = driver.Create(str(network_fullpath), 0, 0, 0, gdal.GDT_Unknown,
                                            [u'net_name=' + net_name,
                                             u'net_description=' + network_base.GetDescription(),
                                             u'net_srs=' + network_base.GetProjection()])
 
-            network = gnm.CastToNetwork(dataset_direct)
-            gen_network = gnm.CastToGenericNetwork(dataset_direct)
+            network = gnm.CastToNetwork(dataset_simplify)
+            gen_network = gnm.CastToGenericNetwork(dataset_simplify)
 
             layers_base_count = dataset_base.GetLayerCount()
             for i in range(0, layers_base_count):
@@ -598,17 +598,17 @@ class GNMManager:
                 layer_base_name = layer_base.GetName()
                 network.CopyLayer(layer_base, str(layer_base_name))
 
-            layers_direct_count = dataset_direct.GetLayerCount()
-            layers_direct = []
-            layers_direct_names = []
-            for i in range(0, layers_direct_count):
-                layer_direct = dataset_direct.GetLayerByIndex(i)
-                layers_direct.append(layer_direct)
-                layers_direct_name = layer_direct.GetName()
-                layers_direct_names.append(layers_direct_name)
+            layers_simplify_count = dataset_simplify.GetLayerCount()
+            layers_simplify = []
+            layers_simplify_names = []
+            for i in range(0, layers_simplify_count):
+                layer_simplify = dataset_simplify .GetLayerByIndex(i)
+                layers_simplify.append(layer_simplify)
+                layers_simplify_name = layer_simplify.GetName()
+                layers_simplify_names.append(layers_simplify_name)
 
             # Choose one linear layer
-            for item in layers_direct:
+            for item in layers_simplify:
                 if item.GetGeomType() == 2:
                     layer = item
                     break
@@ -654,27 +654,28 @@ class GNMManager:
                 polyline.SetGeometryDirectly(simplify)
                 layer.SetFeature(polyline)
 
-            for item in layers_direct:
+            for item in layers_simplify:
                 item.ResetReading()
 
-            gen_network.ConnectPointsByLines(layers_direct_names, 0.00005, 1, 1, gnm.GNM_EDGE_DIR_BOTH)
+            # TODO: remove hardcoded tolerance:
+            gen_network.ConnectPointsByLines(layers_simplify_names, 0.00005, 1, 1, gnm.GNM_EDGE_DIR_BOTH)
 
             dataset_base = None
-            dataset_direct = None
+            dataset_simplify = None
             network_base = None
             gen_network = None
             network = None
 
             net_fullpath = network_fullpath + '/' + net_name
-            dataset_direct = gdal.OpenEx(str(net_fullpath))
-            self.NETWORK_DS = dataset_direct
+            dataset_simplify = gdal.OpenEx(str(net_fullpath))
+            self.NETWORK_DS = dataset_simplify
             self.NETWORK_FULLPATH = net_fullpath
 
             layers_passed_count = 0
-            data_layer_count = dataset_direct.GetLayerCount()
+            data_layer_count = dataset_simplify.GetLayerCount()
             for i in range(0, data_layer_count):
-                gdal_layer = dataset_direct.GetLayer(i)
-                data_layer = self.loadDataLayer(direct_angles_group, gdal_layer, network_fullpath + '/' + net_name)
+                gdal_layer = dataset_simplify.GetLayer(i)
+                data_layer = self.loadDataLayer(simplify_layout_group, gdal_layer, network_fullpath + '/' + net_name)
                 if data_layer is None:
                     layers_passed_count = layers_passed_count + 1
                     continue
